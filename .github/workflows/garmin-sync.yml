@@ -1,0 +1,51 @@
+
+name: Garmin one-click sync
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Garmin official client
+        run: python -m pip install garmin-connect-personal-api-python
+
+      - name: Restore previous data cache
+        uses: actions/cache/restore@v4
+        with:
+          path: garmin_data
+          key: garmin-data-${{ github.run_id }}
+          restore-keys: |
+            garmin-data-
+
+      - name: Download and package running activities
+        env:
+          GARMIN_PERSONAL_API_KEY: ${{ secrets.GARMIN_PERSONAL_API_KEY }}
+        run: python sync.py
+
+      - name: Save incremental data cache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: garmin_data
+          key: garmin-data-${{ github.run_id }}
+
+      - name: Upload ChatGPT-ready ZIP
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: garmin-chatgpt-export
+          path: garmin_upload_to_chatgpt.zip
+          retention-days: 30
